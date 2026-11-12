@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hotelbooking}
+      POSTGRES_USER: ${POSTGRES_USER:-hotelbooking}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - source: postgres_password
+        target: postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    networks:
+      - hotelbooking
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: HotelBookingAPI/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_HTTP_PORTS: 8080
+      Database__ApplyMigrationsOnStartup: "true"
+      Postgres__Host: db
+      Postgres__Port: 5432
+      Postgres__Database: ${POSTGRES_DB:-hotelbooking}
+      Postgres__Username: ${POSTGRES_USER:-hotelbooking}
+      Jwt__Issuer: ${JWT_ISSUER:-HotelBookingAPI}
+      Jwt__Audience: ${JWT_AUDIENCE:-HotelBookingAPIUsers}
+      AdminSeed__Email: ${ADMIN_SEED_EMAIL:?Set ADMIN_SEED_EMAIL in .env}
+    secrets:
+      - source: postgres_password
+        target: Postgres__Password
+      - source: jwt_signing_key
+        target: Jwt__Key
+      - source: admin_seed_password
+        target: AdminSeed__Password
+    ports:
+      - "${API_HOST_PORT:-8080}:8080"
+    networks:
+      - hotelbooking
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  hotelbooking:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  jwt_signing_key:
+    file: ./secrets/jwt_signing_key
+  admin_seed_password:
+    file: ./secrets/admin_seed_password

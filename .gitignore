@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+secrets/
+**/bin/
+**/obj/
+**/TestResults/
+**/TestResults/**
+.build-temp/
+HotelBookingAPI/appsettings.Development.json
+.vs/
+.idea/
